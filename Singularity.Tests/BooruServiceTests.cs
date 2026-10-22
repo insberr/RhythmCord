@@ -7,7 +7,7 @@ namespace Singularity.Tests;
 
 public class BooruServiceTests
 {
-    private sealed class FakeClient(List<E621Post>? posts = null) : IE621Client
+    internal sealed class FakeClient(List<E621Post>? posts = null) : IE621Client
     {
         public string? LastTags { get; private set; }
         public int LastLimit { get; private set; }
@@ -82,7 +82,7 @@ public class BooruServiceTests
         message.Components.OfType<MediaGalleryProperties>().SingleOrDefault()?.Items.Single().Media.Url;
 
     private static List<LinkButtonProperties> Buttons(ComponentContainerProperties message) =>
-        message.Components.OfType<ActionRowProperties>().SingleOrDefault()?.Components.Cast<LinkButtonProperties>().ToList() ?? [];
+        message.Components.OfType<ActionRowProperties>().SingleOrDefault()?.Components.OfType<LinkButtonProperties>().ToList() ?? [];
 
     [Fact]
     public async Task Prefers_a_post_that_can_show_something()
@@ -208,5 +208,48 @@ public class E621PostTests
         Assert.Equal("f", BooruServiceTests.Post(1, fileUrl: "f", ext: "png").GetBestImageUrl());
         Assert.Equal("p", BooruServiceTests.Post(1, fileUrl: "f.webm", ext: "webm", previewUrl: "p").GetBestImageUrl());
         Assert.Null(BooruServiceTests.Post(1, ext: "webm").GetBestImageUrl());
+    }
+}
+
+public class BooruSearchTests
+{
+    [Fact]
+    public void Custom_id_round_trips_tags_with_colons_and_percent_signs()
+    {
+        var search = new BooruSearch("score:>10  fox 100%", BooruRating.Explicit, BooruMediaType.Video);
+
+        var id = search.ToCustomId();
+
+        Assert.Equal("e621-another:Explicit:Video:score%3A>10 fox 100%25", id);
+        var segments = id!.Split(':');
+        Assert.Equal(4, segments.Length);
+        Assert.Equal(search with { Tags = "score:>10 fox 100%" }, BooruSearch.FromCustomId(segments[1], segments[2], segments[3]));
+    }
+
+    [Fact]
+    public void Empty_values_round_trip()
+    {
+        var id = new BooruSearch("", null, null).ToCustomId();
+
+        Assert.Equal("e621-another:-:-:-", id);
+        Assert.Equal(new BooruSearch("", null, null), BooruSearch.FromCustomId("-", "-", "-"));
+    }
+
+    [Fact]
+    public void Search_too_long_for_a_button_gives_no_id()
+    {
+        Assert.Null(new BooruSearch(new string('a', 100), null, null).ToCustomId());
+    }
+
+    [Fact]
+    public void Another_button_is_added_only_when_given_an_id()
+    {
+        var service = new BooruService(new BooruServiceTests.FakeClient());
+
+        var with = service.BuildMessage(BooruServiceTests.Post(1), "e621-another:-:-:-");
+        var button = Assert.IsType<ButtonProperties>(with.Components.OfType<ActionRowProperties>().Single().Components.First());
+        Assert.Equal("e621-another:-:-:-", button.CustomId);
+
+        Assert.Empty(service.BuildMessage(BooruServiceTests.Post(2)).Components.OfType<ActionRowProperties>());
     }
 }

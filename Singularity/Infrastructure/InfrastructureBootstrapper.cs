@@ -7,6 +7,7 @@ using Singularity.Features.Music.Resolvers;
 using Singularity.Features.Music.Player;
 using Singularity.Features.Music.Services;
 using NetCord.Gateway.Voice;
+using Singularity.Features.Booru;
 using Singularity.Features.Booru.Clients;
 using Singularity.Features.Booru.Services;
 
@@ -67,6 +68,7 @@ public static class InfrastructureBootstrapper
         // E621Client sets its own base address and User-Agent.
         services.AddHttpClient<IE621Client, E621Client>();
         services.AddSingleton<BooruService>();
+        services.AddSingleton<BooruResponder>();
 
         return services;
     }

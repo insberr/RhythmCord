@@ -13,6 +13,7 @@ public partial class BooruService(IE621Client client)
         string userTags,
         BooruRating? ratingFilter,
         BooruMediaType? typeFilter,
+        string? anotherButtonId = null,
         CancellationToken cancellationToken = default)
     {
         var tagList = new List<string>();
@@ -64,7 +65,7 @@ public partial class BooruService(IE621Client client)
         var post = posts.FirstOrDefault(p => p.GetMediaUrl() is not null) ?? posts.FirstOrDefault();
         if (post is null) return null;
 
-        return BuildMessage(post);
+        return BuildMessage(post, anotherButtonId);
     }
 
     private const int DescriptionExcerptLength = 280;
@@ -86,8 +87,9 @@ public partial class BooruService(IE621Client client)
     /// <summary>
     /// Lays the post out as a Components V2 container. Unlike an embed, its media gallery can play videos inline.
     /// The message it goes in must carry <see cref="MessageFlags.IsComponentsV2"/> and no content or embeds.
+    /// <paramref name="anotherButtonId"/> adds a Another button with that custom ID, to run the search again.
     /// </summary>
-    internal ComponentContainerProperties BuildMessage(E621Post post)
+    internal ComponentContainerProperties BuildMessage(E621Post post, string? anotherButtonId = null)
     {
         var rating = post.Rating ?? "?";
         var title = Title(post);
@@ -150,7 +152,7 @@ public partial class BooruService(IE621Client client)
             footer.Add($"<t:{created.ToUnixTimeSeconds()}:D>");
         components.Add(new TextDisplayProperties($"-# {string.Join(" • ", footer)}"));
 
-        var buttons = BuildButtons(post);
+        var buttons = BuildButtons(post, anotherButtonId);
         if (buttons.Count > 0)
             components.Add(new ActionRowProperties(buttons));
 
@@ -166,9 +168,12 @@ public partial class BooruService(IE621Client client)
         };
     }
 
-    internal static List<LinkButtonProperties> BuildButtons(E621Post post)
+    internal static List<IActionRowComponentProperties> BuildButtons(E621Post post, string? anotherButtonId)
     {
-        var buttons = new List<LinkButtonProperties>();
+        var buttons = new List<IActionRowComponentProperties>();
+
+        if (anotherButtonId is not null)
+            buttons.Add(new ButtonProperties(anotherButtonId, "Another", EmojiProperties.Standard("🎲"), ButtonStyle.Primary));
 
         // The gallery shows a downscaled sample (or a still, for flash); this opens the real thing.
         if (post.File?.Url is { } fileUrl && IsButtonUrl(fileUrl))
